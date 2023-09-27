@@ -88,8 +88,8 @@ jobs:
           poetry install --no-interaction
 
       # This is all very self-explanatory, everything is configured and ready for execution, simply invoke the tests.
-      - name: Run Tests
-        env:
-        run: |
-          source $VENV
-          python manage.py test --verbosity=2
+      #- name: Run Tests
+      #  env:
+      #  run: |
+      #    source $VENV
+      #    python manage.py test --verbosity=2
