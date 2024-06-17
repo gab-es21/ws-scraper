@@ -2,20 +2,23 @@
 
 ## Table of Contents
 
-- [Introduction](#introduction)
-- [Data to be Displayed](#data-to-be-displayed)
-  - [Protein Powder Information](#protein-powder-information)
-  - [Brands (Work in Progress)](#brands-work-in-progress)
-  - [Product Name](#product-name)
-  - [Quantity](#quantity)
-  - [Prices](#prices)
-  - [Nutritional Table](#nutritional-table)
-  - [Coupons](#coupons)
-- [Requirements](#requirements)
-- [Installation](#installation)
-- [Environment Variables (.env file)](#environment-variables-env-file)
-- [Running the Project](#running-the-project)
-
+- [WorkoutSavings Frontend](#workoutsavings-frontend)
+  - [Table of Contents](#table-of-contents)
+  - [Introduction](#introduction)
+  - [Data to be Displayed](#data-to-be-displayed)
+    - [Protein Powder Information](#protein-powder-information)
+    - [Brand](#brand)
+    - [Product Name](#product-name)
+    - [Quantity](#quantity)
+    - [Price](#price)
+    - [Nutritional Table](#nutritional-table)
+    - [Coupons](#coupons)
+  - [Requirements](#requirements)
+  - [Installation](#installation)
+  - [Environment Variables (.env file)](#environment-variables-env-file)
+  - [Running the Project](#running-the-project)
+  - [Running the Scraper](#running-the-scraper)
+  - [Additional Notes](#additional-notes)
 
 ## Introduction
 
@@ -24,22 +27,22 @@ The frontend of the Workout Savings project aims to visualize and provide insigh
 ## Data to be Displayed
 
 ### Protein Powder Information
-- [**Brand**](#brand)
-- [**Product Name**](#product-name)
+- **Brand**
+- **Product Name**
 - **Flavour**
-- [**Quantity (g)**](#quantity)
-- [**Prices (€):**](#price)
+- **Quantity (g)**
+- **Prices (€):**
   - Normal Price (€)
   - Price w/ Promo Code (€)
   - Price w/o Promo /100g of Product (€)
   - Price w/ Promo /100g of Product (€)
   - Price w/o Promo /100g of Protein (€)
   - Price w/ Promo /100g of Protein (€)
-- [**Nutritional Value (100g):**](#nutritional-table)
+- **Nutritional Value (100g):**
   - Carbs (%)
   - Fat (%)
   - Protein (%)
-- [**Coupons:**](#coupons)
+- **Coupons:**
   - Coupon Codes
   - Coupon Discounts
 - **Notes:**
@@ -80,43 +83,76 @@ To run this project, you'll need the following:
 
 - Python 3.10
 - Poetry
+- Google Chrome and chromedriver
 
 ## Installation
 
 Follow these steps to set up the project:
 
-1. Clone this repository.
+1. Clone this repository:
+    ```sh
+    git clone <repository_url>
+    cd workoutsavings
+    ```
 
 2. Install project dependencies using Poetry:
-```
-poetry install
-```
+    ```sh
+    poetry install
+    ```
 
 3. Activate the virtual environment:
-```
-poetry shell
-```
+    ```sh
+    poetry shell
+    ```
 
-##Environment Variables (.env file)
+## Environment Variables (.env file)
 
-Create a .env file in the project root and set the following variables:
+Create a `.env` file in the project root and set the following variables:
 
-```
+```dotenv
 DJANGO_SECRET_KEY=dummy
 ALLOWED_HOSTS=127.0.0.1,localhost
 DEBUG=True
+FIREBASE_CREDENTIALS_PATH=path/to/your/firebase/credentials.json
 ```
 
-## Running the project
+## Running the Project
 
 1. Apply existing migrations:
+    ```sh
+    python manage.py migrate
+    ```
 
-```
-make migrate
-```
+2. Create a superuser:
+    ```sh
+    python manage.py createsuperuser
+    ```
 
-2. Start the development server:
+3. Start the development server:
+    ```sh
+    python manage.py runserver
+    ```
 
-```
-make runserver
-```
+4. Access the server at `http://127.0.0.1:8000/`.
+
+## Running the Scraper
+
+To run the scraper and start getting data:
+
+1. Activate your virtual environment if not already active:
+    ```sh
+    poetry shell
+    ```
+
+2. Run the management command to start the scraping process:
+    ```sh
+    python manage.py scrape_data
+    ```
+
+This command will start the scraping process, extract the necessary data, and store it in Firestore.
+
+## Additional Notes
+
+- Ensure that you have Google Chrome and chromedriver installed and correctly set up in your PATH.
+- The `scrape_data` command will scrape data based on the predefined search queries and store the data in Firestore as per the structure defined in the `tasks.py` file.
+- You can customize the scraping logic and the data storage format as needed.
