@@ -1,4 +1,4 @@
-# WorkoutSavings Sracper
+# WorkoutSavings Sraper
 
 ## Table of Contents
 
