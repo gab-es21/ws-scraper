@@ -1,4 +1,4 @@
-# WorkoutSavings Frontend
+# WorkoutSavings Sracper
 
 ## Table of Contents
 
