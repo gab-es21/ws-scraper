@@ -61,7 +61,7 @@ ROOT_URLCONF = 'workoutsavings.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [os.path.join(BASE_DIR, 'workoutsavings/templates')],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
