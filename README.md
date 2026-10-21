@@ -41,13 +41,15 @@ A price tracker for protein powder products. Compares prices per 100g and per 10
             │    ├── /            → React build                      │
             │    └── /api /admin  → api (Django + gunicorn :8000)    │
             │                           │                            │
+            │  scheduler (daily 04:00) ─┤                            │
             │  scraper (one-off job) ───┤                            │
             │                           ▼                            │
             │                      db (PostgreSQL, volume pgdata)    │
             └────────────────────────────────────────────────────────┘
 ```
 
-`api` and `scraper` run the same backend image; `scraper` only starts when invoked.
+`api`, `scheduler` and `scraper` run the same backend image. `scheduler` runs `manage.py scrape` every day;
+`scraper` is for one-off runs and only starts when invoked.
 
 ---
 
@@ -86,7 +88,7 @@ Requirements: Docker with Compose v2.
 ```sh
 cp .env.example .env              # then set DJANGO_SECRET_KEY and POSTGRES_PASSWORD
 
-docker compose up -d --build      # db + api + web → http://localhost:8070
+docker compose up -d --build      # db + api + web + scheduler → http://localhost:8070
 docker compose exec api python manage.py createsuperuser   # admin at /admin/
 
 docker compose run --rm scraper   # scrape every store once
@@ -148,6 +150,11 @@ Each store has an adapter in `backend/scraper/adapters/` with two methods:
 logs a `ScrapeRun`, and on full runs marks listings that disappeared from the store as inactive.
 Requests are spaced 1–2.5 s apart, back off on HTTP 429, and a run stops after 5 failing pages in a row.
 
+**Daily schedule:** the `scheduler` service (`manage.py scheduler`) scrapes every store at `SCRAPE_AT`
+(default `04:00`, `SCRAPE_TIMEZONE` default `Europe/Lisbon`). When it starts and the last successful
+scrape is more than a day old (e.g. the machine was off at 04:00) it scrapes right away.
+Avoid starting a manual `docker compose run --rm scraper` while a scheduled run is in progress.
+
 | Store | Discovery | Data |
 |---|---|---|
 | Prozis | products sitemap, filtered by URL and breadcrumb category (protein, creatine) | product page + `product/index` (all SKUs, prices, stock, coupons) + `product/nutrition-table` once per flavor, re-checked weekly |
@@ -170,6 +177,7 @@ Copy `.env.example` to `.env` in the project root. Docker Compose and Django bot
 | `POSTGRES_PASSWORD` | Docker | **required** |
 | `POSTGRES_DB`, `POSTGRES_USER` | Docker | `workoutsavings` |
 | `WEB_PORT` | Docker | `8070` |
+| `SCRAPE_AT`, `SCRAPE_TIMEZONE` | Docker scheduler | `04:00`, `Europe/Lisbon` |
 
 Django uses PostgreSQL when `POSTGRES_HOST` is set (Compose sets it) and SQLite otherwise.
 
@@ -199,9 +207,11 @@ ws-scraper/
 │   │   ├── models.py               # Store, Product, Variant, Listing, PriceRecord, ...
 │   │   ├── recording.py            # Change-only storage of scraped items
 │   │   ├── runner.py               # Runs a store adapter, logs a ScrapeRun
+│   │   ├── scheduling.py           # Daily run timing (used by `manage.py scheduler`)
 │   │   ├── adapters/               # One module per store (prozis.py, ...)
 │   │   ├── management/commands/
-│   │   │   └── scrape.py           # `python manage.py scrape`
+│   │   │   ├── scrape.py           # `python manage.py scrape`
+│   │   │   └── scheduler.py        # `python manage.py scheduler` (runs forever)
 │   │   └── tests/
 │   ├── workoutsavings/             # Django project config (settings, urls, wsgi)
 │   ├── Dockerfile
