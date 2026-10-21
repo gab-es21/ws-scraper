@@ -35,6 +35,22 @@ services:
       db:
         condition: service_healthy
 
+  # Scrapes every store daily at SCRAPE_AT (and on start if the last success is > 1 day old)
+  scheduler:
+    build: ./backend
+    image: workoutsavings-backend
+    restart: unless-stopped
+    environment:
+      <<: *backend-env
+      SCRAPE_AT: ${SCRAPE_AT:-04:00}
+      SCRAPE_TIMEZONE: ${SCRAPE_TIMEZONE:-Europe/Lisbon}
+    command: ["python", "manage.py", "scheduler"]
+    depends_on:
+      db:
+        condition: service_healthy
+      api:
+        condition: service_started
+
   # One-off job, not started by `docker compose up`:
   #   docker compose run --rm scraper
   scraper:
