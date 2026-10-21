@@ -1,24 +1,48 @@
-# scraper/management/commands/scrape_data.py
+import datetime
+
 from django.core.management.base import BaseCommand
-from scraper.tasks import scrape_links_prozis, store_product_data, get_matching_json_files, get_products_info
+
+from scraper.tasks import get_matching_json_files, get_products_info, save_to_db
+
 
 class Command(BaseCommand):
-    help = 'Scrapes data from the specified website and stores it in Firestore'
+    help = "Extract product data from saved Prozis link files and store in the database."
 
-    def handle(self, *args, **kwargs):
-        search_queries = ['caseina', 'whey', 'vegan_protein', 'creatine']
-        url = 'https://www.prozis.com/pt/pt/'
-        languages = ['pt']
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--date",
+            type=str,
+            default=None,
+            help="Date of the link files to process (YYYY-MM-DD). Defaults to today.",
+        )
+        parser.add_argument(
+            "--query",
+            type=str,
+            default=None,
+            help="Filter link files by search query (e.g. 'whey', 'creatine').",
+        )
 
-        # Step 1: Scrape Links
-        scrape_links_prozis(search_queries, url, languages)
+    def handle(self, *args, **options):
+        date = None
+        if options["date"]:
+            date = datetime.datetime.strptime(options["date"], "%Y-%m-%d")
 
-        # Step 2: Extract Product Info and Store in Firestore
-        # Assuming you have a function `get_matching_json_files` to get the JSON files and `get_products_info` to parse the JSON files
-        json_files = get_matching_json_files()
+        json_files = get_matching_json_files(date=date, search_query=options["query"])
+
+        if not json_files:
+            self.stdout.write(self.style.WARNING(
+                "No link files found. Add product URLs to the links/ folder first."
+            ))
+            return
+
         products = get_products_info(json_files)
 
-        for product in products:
-            store_product_data(product)
+        saved = 0
+        for product_data in products:
+            try:
+                save_to_db(product_data)
+                saved += 1
+            except Exception as e:
+                self.stdout.write(self.style.ERROR(f"Failed to save {product_data.get('name')}: {e}"))
 
-        self.stdout.write(self.style.SUCCESS('Successfully scraped data and stored in Firestore'))
+        self.stdout.write(self.style.SUCCESS(f"Done — {saved}/{len(products)} products saved to DB."))
