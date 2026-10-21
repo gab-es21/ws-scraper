@@ -1,68 +1,75 @@
 import os
 
+from django.db.models import Prefetch
 from rest_framework import viewsets
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
-from .models import Brand, Price, Product
-from .serializers import BrandSerializer, PriceSerializer, ProductSerializer
+from .models import Brand, Listing, NutritionRecord, PriceRecord, Product, Store, price_per_100g
+from .serializers import BrandSerializer, ProductSerializer, StoreSerializer
 from .tasks import get_products_info, save_to_db
 
 
-class BrandViewSet(viewsets.ModelViewSet):
-    queryset = Brand.objects.all()
+class StoreViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Store.objects.order_by("name")
+    serializer_class = StoreSerializer
+
+
+class BrandViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Brand.objects.order_by("name")
     serializer_class = BrandSerializer
 
 
-class ProductViewSet(viewsets.ModelViewSet):
-    queryset = Product.objects.all()
+class ProductViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = ProductSerializer
 
-
-class PriceViewSet(viewsets.ModelViewSet):
-    queryset = Price.objects.all()
-    serializer_class = PriceSerializer
+    def get_queryset(self):
+        products = Product.objects.order_by("name")
+        brand = self.request.query_params.get("brand")
+        if brand:
+            products = products.filter(brand_id=brand)
+        return products
 
 
 @api_view(["GET"])
 def extraction_status(request):
-    """Return every product with its current price and last extraction time."""
-    rows = Price.objects.select_related(
-        "product_variant__product__brand",
-        "product_variant__quantity",
-    ).order_by("product_variant__product__brand__name", "product_variant__product__name")
+    """Every listing with its current price, nutrition and when it was last checked."""
+    listings = (
+        Listing.objects.select_related("store", "variant__product__brand")
+        .prefetch_related(
+            Prefetch("price_records", PriceRecord.objects.filter(valid_to__isnull=True), to_attr="current_prices"),
+            Prefetch(
+                "nutrition_records",
+                NutritionRecord.objects.filter(valid_to__isnull=True),
+                to_attr="current_nutritions",
+            ),
+        )
+        .order_by("variant__product__brand__name", "variant__product__name", "variant__flavor", "variant__size_g")
+    )
 
     data = []
-    for price in rows:
-        pv = price.product_variant
-        product = pv.product
-        try:
-            nv = pv.nutritional_value
-            protein = nv.protein_percentage
-            fat = nv.fat_percentage
-            carbs = nv.carbs_percentage
-            # 0/0/0 means the data was never successfully extracted
-            if protein == 0 and fat == 0 and carbs == 0:
-                protein = fat = carbs = None
-        except Exception:
-            protein = fat = carbs = None
+    for listing in listings:
+        variant, product = listing.variant, listing.variant.product
+        price = listing.current_prices[0] if listing.current_prices else None
+        nutrition = listing.current_nutritions[0] if listing.current_nutritions else None
         data.append(
             {
-                "id": product.id,
-                "name": product.name,
+                "id": listing.id,
+                "store": listing.store.name,
                 "brand": product.brand.name,
-                "weight_g": pv.quantity.amount_g,
-                "price_eur": price.normal_price,
-                "price_per_100g": round(price.price_per_100g, 2),
-                "is_available": product.is_available,
-                "last_extracted": price.last_updated,
-                "product_url": product.product_url,
-                "protein_g": protein,
-                "fat_g": fat,
-                "carbs_g": carbs,
+                "name": product.name,
+                "flavor": variant.flavor,
+                "weight_g": variant.size_g,
+                "price_eur": price.price if price else None,
+                "price_per_100g": price_per_100g(price.price, variant.size_g) if price else None,
+                "is_available": bool(price and price.in_stock and listing.is_active),
+                "last_extracted": price.last_checked_at if price else None,
+                "product_url": listing.url,
+                "protein_g": nutrition.protein_g if nutrition else None,
+                "fat_g": nutrition.fat_g if nutrition else None,
+                "carbs_g": nutrition.carbs_g if nutrition else None,
             }
         )
-
     return Response(data)
 
 
