@@ -25,6 +25,7 @@ def random_sleep():
 
 # ── Link file helpers ─────────────────────────────────────────────────────────
 
+
 def write_links_to_json(links, search_query, language):
     now = datetime.datetime.now()
     date_string = now.strftime("%Y-%m-%d")
@@ -41,10 +42,7 @@ def get_matching_json_files(date=None, search_query=None):
     print("\n[READING LINK FILES]\n")
     date_string = (date or datetime.datetime.now()).strftime("%Y-%m-%d")
 
-    json_files = [
-        f for f in os.listdir("links")
-        if f.startswith("prozis") and f.endswith(f"{date_string}.json")
-    ]
+    json_files = [f for f in os.listdir("links") if f.startswith("prozis") and f.endswith(f"{date_string}.json")]
     if search_query:
         json_files = [f for f in json_files if search_query in f]
 
@@ -59,6 +57,7 @@ def get_matching_json_files(date=None, search_query=None):
 
 
 # ── Extraction helpers ────────────────────────────────────────────────────────
+
 
 def _parse_weight_g(name):
     match = re.search(r"(\d+(?:[.,]\d+)?)\s*g\b", name, re.IGNORECASE)
@@ -111,6 +110,20 @@ def extract_nutrition(session, group_id, sku):
         return None, None, None
 
 
+def _find_product_jsonld(soup):
+    """Return the first JSON-LD block of @type Product on the page, or None."""
+    for script in soup.find_all("script", type="application/ld+json"):
+        raw = re.sub(r"/\*<!\[CDATA\[\*/\s*", "", script.text.strip())
+        raw = re.sub(r"\s*/\*\]\]>\*/", "", raw)
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            continue
+        if data.get("@type") == "Product":
+            return data
+    return None
+
+
 def extract_product_jsonld(url):
     """
     Fetch a Prozis product page and extract price/name/brand via JSON-LD
@@ -129,21 +142,8 @@ def extract_product_jsonld(url):
             print(f"  HTTP {r.status_code} for {clean}")
             return None
 
-        soup = BeautifulSoup(r.text, "html.parser")
-
         # Step 2: extract JSON-LD
-        product_data = None
-        for script in soup.find_all("script", type="application/ld+json"):
-            raw = re.sub(r"/\*<!\[CDATA\[\*/\s*", "", script.text.strip())
-            raw = re.sub(r"\s*/\*\]\]>\*/", "", raw)
-            try:
-                data = json.loads(raw)
-            except json.JSONDecodeError:
-                continue
-            if data.get("@type") == "Product":
-                product_data = data
-                break
-
+        product_data = _find_product_jsonld(BeautifulSoup(r.text, "html.parser"))
         if not product_data:
             return None
 
@@ -157,7 +157,11 @@ def extract_product_jsonld(url):
             "price": float(offers.get("price", 0)),
             "currency": offers.get("priceCurrency", "EUR"),
             "is_available": "InStock" in offers.get("availability", ""),
-            "image_url": "https:" + product_data["image"] if product_data.get("image", "").startswith("//") else product_data.get("image", ""),
+            "image_url": (
+                "https:" + product_data["image"]
+                if product_data.get("image", "").startswith("//")
+                else product_data.get("image", "")
+            ),
             "sku": sku,
             "url": clean,
             "weight_g": _parse_weight_g(name),
@@ -219,7 +223,11 @@ def get_products_info(json_files):
             if data:
                 products.append(data)
                 success += 1
-                nut = f"P:{data['protein_g']}g F:{data['fat_g']}g C:{data['carbs_g']}g" if data["protein_g"] is not None else "no nutrition"
+                nut = (
+                    f"P:{data['protein_g']}g F:{data['fat_g']}g C:{data['carbs_g']}g"
+                    if data["protein_g"] is not None
+                    else "no nutrition"
+                )
                 print(f"OK  {data['price']} EUR  [{nut}]")
             else:
                 failed.append(link)
@@ -239,10 +247,16 @@ def get_products_info(json_files):
 
 # ── Django ORM storage ────────────────────────────────────────────────────────
 
+
 def save_to_db(product_data):
     from scraper.models import (
-        Brand, Product, Flavor, Quantity,
-        ProductVariant, NutritionalValue, Price,
+        Brand,
+        Flavor,
+        NutritionalValue,
+        Price,
+        Product,
+        ProductVariant,
+        Quantity,
     )
 
     brand, _ = Brand.objects.get_or_create(name=product_data["brand"])

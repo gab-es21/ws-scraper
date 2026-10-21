@@ -28,13 +28,10 @@ class PriceViewSet(viewsets.ModelViewSet):
 @api_view(["GET"])
 def extraction_status(request):
     """Return every product with its current price and last extraction time."""
-    rows = (
-        Price.objects.select_related(
-            "product_variant__product__brand",
-            "product_variant__quantity",
-        )
-        .order_by("product_variant__product__brand__name", "product_variant__product__name")
-    )
+    rows = Price.objects.select_related(
+        "product_variant__product__brand",
+        "product_variant__quantity",
+    ).order_by("product_variant__product__brand__name", "product_variant__product__name")
 
     data = []
     for price in rows:
@@ -50,20 +47,22 @@ def extraction_status(request):
                 protein = fat = carbs = None
         except Exception:
             protein = fat = carbs = None
-        data.append({
-            "id": product.id,
-            "name": product.name,
-            "brand": product.brand.name,
-            "weight_g": pv.quantity.amount_g,
-            "price_eur": price.normal_price,
-            "price_per_100g": round(price.price_per_100g, 2),
-            "is_available": product.is_available,
-            "last_extracted": price.last_updated,
-            "product_url": product.product_url,
-            "protein_g": protein,
-            "fat_g": fat,
-            "carbs_g": carbs,
-        })
+        data.append(
+            {
+                "id": product.id,
+                "name": product.name,
+                "brand": product.brand.name,
+                "weight_g": pv.quantity.amount_g,
+                "price_eur": price.normal_price,
+                "price_per_100g": round(price.price_per_100g, 2),
+                "is_available": product.is_available,
+                "last_extracted": price.last_updated,
+                "product_url": product.product_url,
+                "protein_g": protein,
+                "fat_g": fat,
+                "carbs_g": carbs,
+            }
+        )
 
     return Response(data)
 
@@ -72,10 +71,7 @@ def extraction_status(request):
 def run_extraction(request):
     """Trigger extraction on all saved link files and save results to DB."""
     links_dir = "links"
-    all_files = [
-        f for f in os.listdir(links_dir)
-        if f.startswith("prozis") and f.endswith(".json")
-    ]
+    all_files = [f for f in os.listdir(links_dir) if f.startswith("prozis") and f.endswith(".json")]
 
     if not all_files:
         return Response({"error": "No link files found in links/"}, status=404)
@@ -90,12 +86,14 @@ def run_extraction(request):
         except Exception as e:
             failed.append({"name": p.get("name"), "error": str(e)})
 
-    return Response({
-        "files_processed": len(all_files),
-        "extracted": len(products),
-        "saved": len(saved),
-        "failed": failed,
-    })
+    return Response(
+        {
+            "files_processed": len(all_files),
+            "extracted": len(products),
+            "saved": len(saved),
+            "failed": failed,
+        }
+    )
 
 
 def index(request):

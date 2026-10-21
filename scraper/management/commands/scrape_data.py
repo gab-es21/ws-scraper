@@ -30,9 +30,7 @@ class Command(BaseCommand):
         json_files = get_matching_json_files(date=date, search_query=options["query"])
 
         if not json_files:
-            self.stdout.write(self.style.WARNING(
-                "No link files found. Add product URLs to the links/ folder first."
-            ))
+            self.stdout.write(self.style.WARNING("No link files found. Add product URLs to the links/ folder first."))
             return
 
         products = get_products_info(json_files)

@@ -1,11 +1,14 @@
-include .env
+-include .env
 export
 
 runserver:
 	python manage.py runserver
 
 tests:
-	python manage.py test
+	pytest
+
+lint:
+	flake8 .
 
 migrate:
 	python manage.py migrate
@@ -21,15 +24,3 @@ collectstatic:
 
 shell:
 	python manage.py shell
-
-populate:
-	python populate_data.py
-all:
-	rm db.sqlite3
-	rm ./scraper/migrations/0001_initial.py
-	python manage.py makemigrations
-	python manage.py migrate
-	python manage.py createsuperuser
-	python populate_data.py
-	python manage.py runserver
-
