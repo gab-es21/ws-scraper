@@ -42,7 +42,7 @@ services:
     image: workoutsavings-backend
     profiles: ["scraper"]
     environment: *backend-env
-    command: ["python", "manage.py", "scrape_data", "--date", "2024-06-17"]
+    command: ["python", "manage.py", "scrape"]
     depends_on:
       db:
         condition: service_healthy

@@ -13,6 +13,7 @@ A price tracker for protein powder products. Compares prices per 100g and per 10
 - [Data Model](#data-model)
 - [Running with Docker](#running-with-docker)
 - [Local Development](#local-development)
+- [Scraper](#scraper)
 - [Environment Variables](#environment-variables)
 - [API Endpoints](#api-endpoints)
 - [Project Structure](#project-structure)
@@ -26,7 +27,7 @@ A price tracker for protein powder products. Compares prices per 100g and per 10
 | Backend | Django 5.2 + Django REST Framework, gunicorn |
 | Frontend | React 19 + Vite, served by nginx |
 | Database | PostgreSQL 17 (Docker) / SQLite (local dev) |
-| Scraper | requests + BeautifulSoup (JSON-LD) |
+| Scraper | requests + BeautifulSoup, one adapter per store |
 | Runtime | Docker Compose |
 
 ---
@@ -88,7 +89,7 @@ cp .env.example .env              # then set DJANGO_SECRET_KEY and POSTGRES_PASS
 docker compose up -d --build      # db + api + web → http://localhost:8070
 docker compose exec api python manage.py createsuperuser   # admin at /admin/
 
-docker compose run --rm scraper   # run the scraper once
+docker compose run --rm scraper   # scrape every store once
 docker compose logs -f api        # follow logs
 docker compose down               # stop (data stays in the pgdata volume)
 ```
@@ -128,12 +129,31 @@ npm run dev                       # http://localhost:5173
 
 ```sh
 cd backend
-python manage.py scrape_data --date 2024-06-17               # all saved link files of that date
-python manage.py scrape_data --date 2024-06-17 --query whey  # one category
+python manage.py scrape                      # every store
+python manage.py scrape prozis --limit 10    # first 10 product pages only
+python manage.py scrape prozis --url https://www.prozis.com/pt/pt/prozis/whey-fibre-700-g
 ```
 
-The scraper reads product URLs from `backend/links/*.json`, fetches each page with `requests`,
-extracts name, price, stock and image from the page's JSON-LD, and saves the result to the database.
+---
+
+## Scraper
+
+Each store has an adapter in `backend/scraper/adapters/` with two methods:
+
+- `discover()` → the product page URLs to scrape
+- `fetch(url)` → every variant (flavor × size) on that page as a `ScrapedItem`: price, crossed-out
+  price, stock, size and nutrition per 100 g, plus any coupons shown
+
+`runner.py` runs an adapter, records each item through `recording.py` (new rows only on change),
+logs a `ScrapeRun`, and on full runs marks listings that disappeared from the store as inactive.
+Requests are spaced 1–2.5 s apart, back off on HTTP 429, and a run stops after 5 failing pages in a row.
+
+| Store | Discovery | Data |
+|---|---|---|
+| Prozis | products sitemap, filtered by URL and breadcrumb category (protein, creatine) | product page + `product/index` (all SKUs, prices, stock, coupons) + `product/nutrition-table` once per flavor, re-checked weekly |
+
+Prozis' advertised price already includes its best public coupon (e.g. `SUPER`, 15% off the
+crossed-out price); it is stored as the price and the coupon is kept for reference.
 
 ---
 
@@ -163,7 +183,7 @@ Django uses PostgreSQL when `POSTGRES_HOST` is set (Compose sets it) and SQLite 
 | `/api/brands/` | GET | List all brands |
 | `/api/products/?brand=<id>` | GET | Products, optionally for one brand |
 | `/api/extraction-status/` | GET | Every listing with current price, nutrition and last check time |
-| `/api/run-extraction/` | POST | Run the scraper on all saved link files |
+| `/api/scrape-runs/` | GET | The 50 most recent scrape runs |
 | `/admin/` | — | Django admin panel |
 
 > **Note:** The `/api/price_history/` endpoint used by the frontend chart is not yet implemented.
@@ -175,11 +195,15 @@ Django uses PostgreSQL when `POSTGRES_HOST` is set (Compose sets it) and SQLite 
 ```
 ws-scraper/
 ├── backend/
-│   ├── scraper/                    # Django app: models, views, serializers, scraping (tasks.py)
-│   │   └── management/commands/
-│   │       └── scrape_data.py      # `python manage.py scrape_data`
+│   ├── scraper/                    # Django app
+│   │   ├── models.py               # Store, Product, Variant, Listing, PriceRecord, ...
+│   │   ├── recording.py            # Change-only storage of scraped items
+│   │   ├── runner.py               # Runs a store adapter, logs a ScrapeRun
+│   │   ├── adapters/               # One module per store (prozis.py, ...)
+│   │   ├── management/commands/
+│   │   │   └── scrape.py           # `python manage.py scrape`
+│   │   └── tests/
 │   ├── workoutsavings/             # Django project config (settings, urls, wsgi)
-│   ├── links/                      # Saved product URLs (JSON)
 │   ├── Dockerfile
 │   ├── requirements.txt            # Runtime dependencies
 │   └── requirements-dev.txt        # + test and lint tools

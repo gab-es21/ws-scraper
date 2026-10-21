@@ -7,9 +7,9 @@ router = DefaultRouter()
 router.register(r"stores", views.StoreViewSet)
 router.register(r"brands", views.BrandViewSet)
 router.register(r"products", views.ProductViewSet, basename="product")
+router.register(r"scrape-runs", views.ScrapeRunViewSet)
 
 urlpatterns = [
     path("api/", include(router.urls)),
     path("api/extraction-status/", views.extraction_status),
-    path("api/run-extraction/", views.run_extraction),
 ]

@@ -21,4 +21,4 @@ USER app
 EXPOSE 8000
 
 # Apply migrations, then serve. The scraper service overrides this command.
-CMD ["sh", "-c", "python manage.py migrate --noinput && exec gunicorn workoutsavings.wsgi:application --bind 0.0.0.0:8000 --workers 2 --timeout 600 --access-logfile -"]
+CMD ["sh", "-c", "python manage.py migrate --noinput && exec gunicorn workoutsavings.wsgi:application --bind 0.0.0.0:8000 --workers 2 --timeout 60 --access-logfile -"]
