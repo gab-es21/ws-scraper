@@ -1,16 +1,43 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 
+// Latest run per store, newest first (the API returns runs newest first).
+function LastRuns({ runs, formatDate }) {
+  const latest = Object.values(
+    runs.reduce((byStore, run) => ({ ...byStore, [run.store]: byStore[run.store] ?? run }), {})
+  );
+  if (latest.length === 0) return null;
+
+  const colors = { success: '#f0fdf4', partial: '#fffbeb', failed: '#fef2f2', running: '#eff6ff' };
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '16px' }}>
+      {latest.map(run => (
+        <div key={run.id} style={{
+          background: colors[run.status] ?? '#f8fafc', border: '1px solid #e2e8f0',
+          borderRadius: '6px', padding: '8px 14px', fontSize: '14px',
+        }}>
+          <strong>{run.store}</strong> · last scrape {formatDate(run.started_at)} · {run.status} ·{' '}
+          {run.items_found} variants, {run.prices_changed} price changes
+          {run.errors > 0 && `, ${run.errors} errors`}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function ExtractionStatus() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [running, setRunning] = useState(false);
-  const [lastRun, setLastRun] = useState(null);
+  const [runs, setRuns] = useState([]);
 
   const fetchStatus = useCallback(async () => {
     try {
-      const res = await axios.get('/api/extraction-status/');
-      setRows(res.data);
+      const [status, scrapeRuns] = await Promise.all([
+        axios.get('/api/extraction-status/'),
+        axios.get('/api/scrape-runs/'),
+      ]);
+      setRows(status.data);
+      setRuns(scrapeRuns.data);
     } catch (e) {
       console.error('Failed to load status:', e);
     } finally {
@@ -19,20 +46,6 @@ function ExtractionStatus() {
   }, []);
 
   useEffect(() => { fetchStatus(); }, [fetchStatus]);
-
-  const handleRunExtraction = async () => {
-    setRunning(true);
-    setLastRun(null);
-    try {
-      const res = await axios.post('/api/run-extraction/');
-      setLastRun(res.data);
-      await fetchStatus();
-    } catch (e) {
-      setLastRun({ error: e.message });
-    } finally {
-      setRunning(false);
-    }
-  };
 
   const formatDate = (iso) => {
     if (!iso) return '—';
@@ -47,57 +60,14 @@ function ExtractionStatus() {
 
   return (
     <div style={{ padding: '24px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
-        <h2 style={{ margin: 0 }}>Extraction Status</h2>
-        <button
-          onClick={handleRunExtraction}
-          disabled={running}
-          style={{
-            padding: '8px 20px',
-            background: running ? '#999' : '#2563eb',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: running ? 'not-allowed' : 'pointer',
-            fontWeight: 600,
-          }}
-        >
-          {running ? 'Running...' : 'Run Extraction'}
-        </button>
-        {running && (
-          <span style={{ color: '#666', fontSize: '14px' }}>
-            Fetching prices — this takes ~2 min
-          </span>
-        )}
-      </div>
+      <h2 style={{ margin: '0 0 16px' }}>Extraction Status</h2>
 
-      {lastRun && !lastRun.error && (
-        <div style={{
-          background: '#f0fdf4', border: '1px solid #86efac',
-          borderRadius: '6px', padding: '10px 16px', marginBottom: '16px',
-          fontSize: '14px',
-        }}>
-          Last run: <strong>{lastRun.saved}</strong> saved,{' '}
-          <strong>{lastRun.extracted - lastRun.saved}</strong> skipped,{' '}
-          <strong>{lastRun.failed?.length ?? 0}</strong> errors
-          {' '}across <strong>{lastRun.files_processed}</strong> link file(s).
-        </div>
-      )}
-
-      {lastRun?.error && (
-        <div style={{
-          background: '#fef2f2', border: '1px solid #fca5a5',
-          borderRadius: '6px', padding: '10px 16px', marginBottom: '16px',
-          fontSize: '14px',
-        }}>
-          Error: {lastRun.error}
-        </div>
-      )}
+      <LastRuns runs={runs} formatDate={formatDate} />
 
       {loading ? (
         <p>Loading...</p>
       ) : rows.length === 0 ? (
-        <p>No products in the database yet. Run an extraction first.</p>
+        <p>No products in the database yet. Run the scraper: <code>docker compose run --rm scraper</code></p>
       ) : (
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>

@@ -1,13 +1,10 @@
-import os
-
 from django.db.models import Prefetch
-from rest_framework import viewsets
+from rest_framework import mixins, viewsets
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
-from .models import Brand, Listing, NutritionRecord, PriceRecord, Product, Store, price_per_100g
-from .serializers import BrandSerializer, ProductSerializer, StoreSerializer
-from .tasks import get_products_info, save_to_db
+from .models import Brand, Listing, NutritionRecord, PriceRecord, Product, ScrapeRun, Store, price_per_100g
+from .serializers import BrandSerializer, ProductSerializer, ScrapeRunSerializer, StoreSerializer
 
 
 class StoreViewSet(viewsets.ReadOnlyModelViewSet):
@@ -73,30 +70,11 @@ def extraction_status(request):
     return Response(data)
 
 
-@api_view(["POST"])
-def run_extraction(request):
-    """Trigger extraction on all saved link files and save results to DB."""
-    links_dir = "links"
-    all_files = [f for f in os.listdir(links_dir) if f.startswith("prozis") and f.endswith(".json")]
+class ScrapeRunViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
+    """The 50 most recent scrape runs, newest first."""
 
-    if not all_files:
-        return Response({"error": "No link files found in links/"}, status=404)
+    queryset = ScrapeRun.objects.select_related("store")
+    serializer_class = ScrapeRunSerializer
 
-    products = get_products_info(all_files)
-
-    saved, failed = [], []
-    for p in products:
-        try:
-            save_to_db(p)
-            saved.append(p["name"])
-        except Exception as e:
-            failed.append({"name": p.get("name"), "error": str(e)})
-
-    return Response(
-        {
-            "files_processed": len(all_files),
-            "extracted": len(products),
-            "saved": len(saved),
-            "failed": failed,
-        }
-    )
+    def get_queryset(self):
+        return super().get_queryset()[:50]
