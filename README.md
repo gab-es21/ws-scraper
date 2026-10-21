@@ -53,15 +53,28 @@ A price tracker for protein powder products. Compares prices per 100g and per 10
 ## Data Model
 
 ```
-Brand
-  └── Product
-        └── ProductVariant  (Product × Flavor × Quantity)
-              ├── NutritionalValue  (carbs %, fat %, protein %)
-              ├── Price             (current price + price/100g + price/100g protein)
-              └── HistoricalPrice   (one entry per scrape run)
+Store ─┐
+Brand ─┴─► Product ─► Variant (flavor, size_g, gtin)
+                         │
+                         └─► Listing (store, store_sku, url, is_active)
+                                ├─► PriceRecord      price, list_price, in_stock
+                                └─► NutritionRecord  protein / carbs / fat per 100 g
 
-Coupon  (linked to Brand)
+Coupon (store, code, discount %)        ScrapeRun (store, status, counts, log)
 ```
+
+**History stores changes only.** Each scrape compares the scraped values with the
+current `PriceRecord` / `NutritionRecord` of the listing:
+
+- same values → only `last_checked_at` is updated
+- different values → the current record gets `valid_to = now` and a new record starts with `valid_from = now`
+
+So each row is a period during which the price (or nutrition) stayed the same, and
+`valid_from` is exactly when a change was first seen. The logic lives in
+`backend/scraper/recording.py`.
+
+€/100g and €/100g of protein are computed from the current price, the variant's size
+and the current nutrition (`price_per_100g`, `price_per_100g_protein` in `models.py`).
 
 ---
 
@@ -146,10 +159,10 @@ Django uses PostgreSQL when `POSTGRES_HOST` is set (Compose sets it) and SQLite 
 
 | Endpoint | Method | Description |
 |---|---|---|
+| `/api/stores/` | GET | List all stores |
 | `/api/brands/` | GET | List all brands |
-| `/api/products/?brand=<id>` | GET | Products for a brand |
-| `/api/prices/` | GET | All current prices |
-| `/api/extraction-status/` | GET | Products with current price, nutrition and last extraction time |
+| `/api/products/?brand=<id>` | GET | Products, optionally for one brand |
+| `/api/extraction-status/` | GET | Every listing with current price, nutrition and last check time |
 | `/api/run-extraction/` | POST | Run the scraper on all saved link files |
 | `/admin/` | — | Django admin panel |
 

@@ -123,10 +123,10 @@ function ExtractionStatus() {
                 return (
                   <tr key={row.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
                     <td style={td}>{row.brand}</td>
-                    <td style={td}>{row.name}</td>
-                    <td style={td}>{row.weight_g}g</td>
-                    <td style={td}>{row.price_eur.toFixed(2)}</td>
-                    <td style={td}>{row.price_per_100g.toFixed(2)}</td>
+                    <td style={td}>{row.flavor ? `${row.name} · ${row.flavor}` : row.name}</td>
+                    <td style={td}>{row.weight_g != null ? `${row.weight_g}g` : '—'}</td>
+                    <td style={td}>{row.price_eur != null ? row.price_eur.toFixed(2) : '—'}</td>
+                    <td style={td}>{row.price_per_100g != null ? row.price_per_100g.toFixed(2) : '—'}</td>
                     <td style={{ ...td, color: row.protein_g != null ? '#166534' : '#9ca3af' }}>
                       {row.protein_g != null ? `${row.protein_g}g` : '—'}
                     </td>

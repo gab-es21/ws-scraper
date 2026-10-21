@@ -8,6 +8,9 @@ import time
 import requests
 from bs4 import BeautifulSoup
 
+from .models import Store
+from .recording import ScrapedItem, record_item
+
 HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -249,58 +252,21 @@ def get_products_info(json_files):
 
 
 def save_to_db(product_data):
-    from scraper.models import (
-        Brand,
-        Flavor,
-        NutritionalValue,
-        Price,
-        Product,
-        ProductVariant,
-        Quantity,
+    """Store one extracted Prozis product (dict from extract_product_jsonld)."""
+    store, _ = Store.objects.get_or_create(
+        slug="prozis", defaults={"name": "Prozis", "website": "https://www.prozis.com/pt/pt"}
     )
-
-    brand, _ = Brand.objects.get_or_create(name=product_data["brand"])
-
-    product, _ = Product.objects.update_or_create(
-        brand=brand,
-        name=product_data["name"],
-        defaults={
-            "image_url": product_data["image_url"],
-            "product_url": product_data["url"],
-            "is_available": product_data["is_available"],
-        },
+    item = ScrapedItem(
+        store_sku=product_data["sku"] or product_data["url"],
+        url=product_data["url"],
+        brand=product_data["brand"],
+        product_name=product_data["name"],
+        price=product_data["price"],
+        in_stock=product_data["is_available"],
+        size_g=product_data.get("weight_g"),
+        image_url=product_data["image_url"],
+        protein_g=product_data.get("protein_g"),
+        carbs_g=product_data.get("carbs_g"),
+        fat_g=product_data.get("fat_g"),
     )
-
-    flavor, _ = Flavor.objects.get_or_create(name="default")
-    weight = product_data.get("weight_g") or 1000.0
-    quantity, _ = Quantity.objects.get_or_create(amount_g=weight)
-
-    variant, created = ProductVariant.objects.get_or_create(
-        product=product,
-        flavor=flavor,
-        quantity=quantity,
-    )
-
-    # Update nutrition if we got values
-    protein = product_data.get("protein_g") or 0
-    fat = product_data.get("fat_g") or 0
-    carbs = product_data.get("carbs_g") or 0
-
-    NutritionalValue.objects.update_or_create(
-        product_variant=variant,
-        defaults={
-            "protein_percentage": protein,
-            "fat_percentage": fat,
-            "carbs_percentage": carbs,
-        },
-    )
-
-    price_obj, price_created = Price.objects.get_or_create(
-        product_variant=variant,
-        defaults={"normal_price": product_data["price"]},
-    )
-    if not price_created:
-        price_obj.normal_price = product_data["price"]
-        price_obj.save()
-
-    return variant
+    return record_item(store, item)
