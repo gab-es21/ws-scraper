@@ -1,0 +1,59 @@
+name: workoutsavings
+
+x-backend-env: &backend-env
+  DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?Set DJANGO_SECRET_KEY in .env}
+  DEBUG: "False"
+  ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1}
+  CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-}
+  POSTGRES_HOST: db
+  POSTGRES_DB: ${POSTGRES_DB:-workoutsavings}
+  POSTGRES_USER: ${POSTGRES_USER:-workoutsavings}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-workoutsavings}
+      POSTGRES_USER: ${POSTGRES_USER:-workoutsavings}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: ./backend
+    image: workoutsavings-backend
+    restart: unless-stopped
+    environment: *backend-env
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # One-off job, not started by `docker compose up`:
+  #   docker compose run --rm scraper
+  scraper:
+    build: ./backend
+    image: workoutsavings-backend
+    profiles: ["scraper"]
+    environment: *backend-env
+    command: ["python", "manage.py", "scrape_data", "--date", "2024-06-17"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    build: ./frontend
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-8070}:80"
+    depends_on:
+      - api
+
+volumes:
+  pgdata:

@@ -1,26 +1,42 @@
 -include .env
 export
 
-runserver:
-	python manage.py runserver
+# --- Docker -------------------------------------------------------------
 
-tests:
-	pytest
+up:
+	docker compose up -d --build
 
-lint:
-	flake8 .
+down:
+	docker compose down
 
-migrate:
-	python manage.py migrate
+logs:
+	docker compose logs -f
 
-migrations:
-	python manage.py makemigrations
+scrape:
+	docker compose run --rm scraper
 
 superuser:
-	python manage.py createsuperuser
+	docker compose exec api python manage.py createsuperuser
 
-collectstatic:
-	python manage.py collectstatic
+# --- Local development (backend/ with .venv, frontend/ with npm) ---------
+
+runserver:
+	cd backend && python manage.py runserver
+
+frontend:
+	cd frontend && npm run dev
+
+tests:
+	cd backend && pytest
+
+lint:
+	cd backend && flake8 .
+
+migrate:
+	cd backend && python manage.py migrate
+
+migrations:
+	cd backend && python manage.py makemigrations
 
 shell:
-	python manage.py shell
+	cd backend && python manage.py shell
