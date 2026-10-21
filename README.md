@@ -2,7 +2,7 @@
 
 A price tracker for protein powder products. Compares prices per 100g and per 100g of protein across brands, tracks price history over time, and supports coupon codes.
 
-**Brands covered:** Prozis *(MyProtein, Zumub and Gold Nutrition planned)*
+**Stores covered:** Prozis, Gold Nutrition *(MyProtein and Zumub planned; Decathlon blocks automated access)*
 
 ---
 
@@ -133,6 +133,7 @@ npm run dev                       # http://localhost:5173
 cd backend
 python manage.py scrape                      # every store
 python manage.py scrape prozis --limit 10    # first 10 product pages only
+python manage.py scrape gold-nutrition       # one store
 python manage.py scrape prozis --url https://www.prozis.com/pt/pt/prozis/whey-fibre-700-g
 ```
 
@@ -158,6 +159,7 @@ Avoid starting a manual `docker compose run --rm scraper` while a scheduled run 
 | Store | Discovery | Data |
 |---|---|---|
 | Prozis | products sitemap, filtered by URL and breadcrumb category (protein, creatine) | product page + `product/index` (all SKUs, prices, stock, coupons) + `product/nutrition-table` once per flavor, re-checked weekly |
+| Gold Nutrition | Shopify `/products.json` feed (1 request), filtered by title | the same feed: every variant's price, crossed-out price, stock, size. No nutrition: product pages answer 429 to scripts, so enter it in the admin if needed |
 
 Prozis' advertised price already includes its best public coupon (e.g. `SUPER`, 15% off the
 crossed-out price); it is stored as the price and the coupon is kept for reference.
@@ -208,7 +210,7 @@ ws-scraper/
 │   │   ├── recording.py            # Change-only storage of scraped items
 │   │   ├── runner.py               # Runs a store adapter, logs a ScrapeRun
 │   │   ├── scheduling.py           # Daily run timing (used by `manage.py scheduler`)
-│   │   ├── adapters/               # One module per store (prozis.py, ...)
+│   │   ├── adapters/               # One module per store (prozis.py, gold_nutrition.py)
 │   │   ├── management/commands/
 │   │   │   ├── scrape.py           # `python manage.py scrape`
 │   │   │   └── scheduler.py        # `python manage.py scheduler` (runs forever)
