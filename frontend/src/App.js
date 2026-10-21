@@ -2,9 +2,13 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import PriceChart from './components/PriceChart';
 import FilterForm from './components/FilterForm';
+import ExtractionStatus from './components/ExtractionStatus';
 import './App.css';
 
+const TABS = ['Dashboard', 'Extraction'];
+
 function App() {
+  const [tab, setTab] = useState('Extraction');
   const [brands, setBrands] = useState([]);
   const [selectedBrand, setSelectedBrand] = useState('');
   const [products, setProducts] = useState([]);
@@ -12,66 +16,73 @@ function App() {
   const [priceHistory, setPriceHistory] = useState([]);
 
   useEffect(() => {
-    async function fetchBrands() {
-      try {
-        const response = await axios.get('/api/brands/');
-        setBrands(response.data);
-      } catch (error) {
-        console.error('Error fetching brands:', error);
-      }
-    }
-
-    fetchBrands();
+    axios.get('/api/brands/')
+      .then(r => setBrands(r.data))
+      .catch(e => console.error('Error fetching brands:', e));
   }, []);
 
   useEffect(() => {
-    async function fetchProducts() {
-      if (selectedBrand) {
-        try {
-          const response = await axios.get(`/api/products?brand=${selectedBrand}`);
-          setProducts(response.data);
-        } catch (error) {
-          console.error('Error fetching products:', error);
-        }
-      }
-    }
-
-    fetchProducts();
+    if (!selectedBrand) return;
+    axios.get(`/api/products/?brand=${selectedBrand}`)
+      .then(r => setProducts(r.data))
+      .catch(e => console.error('Error fetching products:', e));
   }, [selectedBrand]);
-
-  const handleBrandChange = (event) => {
-    setSelectedBrand(event.target.value);
-  };
-
-  const handleProductChange = (event) => {
-    const selectedOptions = Array.from(event.target.selectedOptions, option => option.value);
-    setSelectedProducts(selectedOptions);
-  };
 
   const handleFetchPriceHistory = async () => {
     try {
-      const response = await axios.post('/api/price_history/', {
-        products: selectedProducts
-      });
-      setPriceHistory(response.data);
-    } catch (error) {
-      console.error('Error fetching price history:', error);
+      const r = await axios.post('/api/price_history/', { products: selectedProducts });
+      setPriceHistory(r.data);
+    } catch (e) {
+      console.error('Error fetching price history:', e);
     }
   };
 
   return (
     <div className="App">
-      <h1>Workout Savings</h1>
-      <FilterForm
-        brands={brands}
-        selectedBrand={selectedBrand}
-        products={products}
-        selectedProducts={selectedProducts}
-        handleBrandChange={handleBrandChange}
-        handleProductChange={handleProductChange}
-        handleFetchPriceHistory={handleFetchPriceHistory}
-      />
-      <PriceChart priceHistory={priceHistory} />
+      <header style={{ background: '#1e293b', color: '#fff', padding: '0 24px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
+          <h1 style={{ margin: '0', padding: '16px 0', fontSize: '20px' }}>Workout Savings</h1>
+          <nav style={{ display: 'flex', gap: '4px' }}>
+            {TABS.map(t => (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                style={{
+                  padding: '8px 16px',
+                  background: tab === t ? '#fff' : 'transparent',
+                  color: tab === t ? '#1e293b' : '#cbd5e1',
+                  border: 'none',
+                  borderRadius: '6px 6px 0 0',
+                  cursor: 'pointer',
+                  fontWeight: tab === t ? 600 : 400,
+                  fontSize: '14px',
+                }}
+              >
+                {t}
+              </button>
+            ))}
+          </nav>
+        </div>
+      </header>
+
+      {tab === 'Dashboard' && (
+        <div style={{ padding: '24px' }}>
+          <FilterForm
+            brands={brands}
+            selectedBrand={selectedBrand}
+            products={products}
+            selectedProducts={selectedProducts}
+            handleBrandChange={e => setSelectedBrand(e.target.value)}
+            handleProductChange={e =>
+              setSelectedProducts(Array.from(e.target.selectedOptions, o => o.value))
+            }
+            handleFetchPriceHistory={handleFetchPriceHistory}
+          />
+          <PriceChart priceHistory={priceHistory} />
+        </div>
+      )}
+
+      {tab === 'Extraction' && <ExtractionStatus />}
     </div>
   );
 }
