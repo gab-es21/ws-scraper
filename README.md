@@ -2,7 +2,7 @@
 
 A price tracker for protein powder products. Compares prices per 100g and per 100g of protein across brands, tracks price history over time, and supports coupon codes.
 
-**Brands covered:** Prozis, MyProtein, Zumub, Gold Nutrition, Decathlon *(more planned)*
+**Brands covered:** Prozis *(MyProtein, Zumub and Gold Nutrition planned)*
 
 ---
 
@@ -15,7 +15,6 @@ A price tracker for protein powder products. Compares prices per 100g and per 10
 - [Running the Project](#running-the-project)
 - [Running the Scraper](#running-the-scraper)
 - [Project Structure](#project-structure)
-- [Firestore Data Structure](#firestore-data-structure)
 
 ---
 
@@ -23,11 +22,11 @@ A price tracker for protein powder products. Compares prices per 100g and per 10
 
 | Layer | Technology |
 |---|---|
-| Backend | Django 5 + Django REST Framework |
-| Frontend | React (served by Django) |
+| Backend | Django 5.2 + Django REST Framework |
+| Frontend | React |
 | Database | SQLite (dev) |
-| Scraper | Selenium + BeautifulSoup + requests |
-| Package manager | Poetry |
+| Scraper | requests + BeautifulSoup (JSON-LD) |
+| Package manager | pip (`requirements.txt`) |
 
 ---
 
@@ -56,9 +55,7 @@ Coupon  (linked to Brand)
 
 ### Requirements
 
-- Python 3.10+
-- Poetry
-- Google Chrome (for the scraper)
+- Python 3.11+
 
 ### Steps
 
@@ -66,28 +63,24 @@ Coupon  (linked to Brand)
 git clone <repository_url>
 cd ws-scraper
 
-# Install Python dependencies
-poetry install
-
-# Activate the virtual environment
-poetry shell
+python -m venv .venv
+.venv\Scripts\activate            # Windows (Linux/macOS: source .venv/bin/activate)
+pip install -r requirements-dev.txt
 ```
 
 ---
 
 ## Environment Variables
 
-Create a `.env` file in the project root:
+Copy `.env.example` to `.env` in the project root and adjust as needed:
 
 ```dotenv
-DJANGO_SECRET_KEY=your-secret-key-here
+DJANGO_SECRET_KEY=change-me
 DEBUG=True
 ALLOWED_HOSTS=127.0.0.1,localhost
-FIREBASE_CREDENTIALS_PATH=./cred/serviceAccount.json
 ```
 
-> `FIREBASE_CREDENTIALS_PATH` must point to a valid Firebase service account JSON file.  
-> The app will not start without it — Firebase is initialized at startup in `settings_local.py`.
+Every variable has a development default, so `.env` is optional locally.
 
 ---
 
@@ -96,9 +89,6 @@ FIREBASE_CREDENTIALS_PATH=./cred/serviceAccount.json
 ```sh
 # Apply migrations
 python manage.py migrate
-
-# (Optional) Load seed data
-python populate_data.py
 
 # Create a superuser for the admin panel
 python manage.py createsuperuser
@@ -116,25 +106,33 @@ Open `http://127.0.0.1:8000/` in your browser.
 | `/api/brands/` | GET | List all brands |
 | `/api/products/?brand=<id>` | GET | Products for a brand |
 | `/api/prices/` | GET | All current prices |
+| `/api/extraction-status/` | GET | Products with current price, nutrition and last extraction time |
+| `/api/run-extraction/` | POST | Run the scraper on all saved link files |
 | `/admin/` | — | Django admin panel |
 
 > **Note:** The `/api/price_history/` endpoint used by the frontend chart is not yet implemented.
+
+**Tests and lint:**
+
+```sh
+pytest
+flake8 .
+```
 
 ---
 
 ## Running the Scraper
 
 ```sh
-# Make sure your virtual environment is active
-poetry shell
+# Extract all products from the saved link files of a given date
+python manage.py scrape_data --date 2024-06-17
 
-# Run the scraper (scrapes Prozis and stores to Firestore)
-python manage.py scrape_data
+# Only one category
+python manage.py scrape_data --date 2024-06-17 --query whey
 ```
 
-This runs in two steps:
-1. **Link discovery** — searches Prozis for product URLs and saves them to `links/` as JSON files
-2. **Data extraction** — opens each product URL and extracts price, flavors, and nutritional info
+The scraper reads product URLs from `links/*.json`, fetches each page with `requests`,
+extracts name, price, stock and image from the page's JSON-LD, and saves the result to the database.
 
 ---
 
@@ -144,73 +142,18 @@ This runs in two steps:
 ws-scraper/
 ├── scraper/                        # Django app
 │   ├── models.py                   # Brand, Product, ProductVariant, Price, etc.
-│   ├── views.py                    # DRF viewsets
+│   ├── views.py                    # DRF viewsets + extraction endpoints
 │   ├── serializers.py
 │   ├── urls.py
-│   ├── tasks.py                    # Scraping logic (Selenium + BeautifulSoup)
-│   └── management/
-│       ├── commands/
-│       │   └── scrape_data.py      # `python manage.py scrape_data`
-│       ├── lib_manage_firebase/    # Firebase CRUD helpers
-│       └── lib_add_by_hand_firebase/
-├── workoutsavings/                 # Django project config
-│   ├── settings_local.py           # Active settings (used by manage.py)
-│   └── urls.py
+│   ├── tasks.py                    # Scraping logic (requests + JSON-LD)
+│   └── management/commands/
+│       └── scrape_data.py          # `python manage.py scrape_data`
+├── workoutsavings/                 # Django project config (settings, urls, wsgi)
 ├── frontend/                       # React app
-│   ├── src/
-│   └── build/                      # Compiled and served by Django
-├── templates/                      # Django HTML templates
-│   └── index.html                  # Loads the React build
-├── static/                         # Manually copied React build assets
+├── templates/index.html            # Loads the React build
 ├── links/                          # Saved product URLs (JSON)
-├── cred/                           # Firebase credentials (gitignored)
-├── populate_data.py                # Seed script for dev data
-├── SCRAPER_STATUS.md               # Detailed scraper health report
-├── pyproject.toml
-└── .env                            # Local environment variables (gitignored)
-```
-
----
-
-## Firestore Data Structure
-
-The original scraper writes to Firestore. This section documents that structure for reference.
-
-### Collections
-
-**`brands/{brand_name}`**
-```
-name: string
-website: string
-product_links/{hash}  →  link, last_updated, category
-search_links/{hash}   →  link, last_updated, category
-```
-
-**`categories/{category_name}`**
-```
-name: string
-```
-
-**`products/{brand_category_name_weight}`**
-```
-brand: ref
-category: ref
-name: string
-image_url: string
-product_url: string
-weight: number (grams)
-carbs_percentage: number
-fat_percentage: number
-protein_percentage: number
-is_available: boolean
-latest_price/latest  →  price, last_updated
-price_history/{id}   →  price, date
-```
-
-**`coupons/{coupon_code}`**
-```
-brand: ref
-discount: number
-is_percentage: boolean
-is_active: boolean
+├── WALKTHROUGH.md                  # How the project works, step by step
+├── requirements.txt                # Runtime dependencies
+├── requirements-dev.txt            # + test and lint tools
+└── .env.example                    # Environment variables template
 ```

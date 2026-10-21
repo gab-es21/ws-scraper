@@ -1,15 +1,20 @@
 from django.contrib import admin
-from .models import Brand, Product, Flavor, Quantity, ProductVariant, Price, NutritionalValue, Coupon, HistoricalPrice
+
+from .models import Brand, Coupon, Flavor, HistoricalPrice, NutritionalValue, Price, Product, ProductVariant, Quantity
+
 
 class PriceAdmin(admin.ModelAdmin):
-    list_display = ('product_variant', 'normal_price', 'price_per_100g', 'price_per_100g_protein')
+    list_display = ("product_variant", "normal_price", "price_per_100g", "price_per_100g_protein")
+
 
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ('name', 'brand_display', 'product_url')
+    list_display = ("name", "brand_display", "product_url")
 
     def brand_display(self, obj):
         return obj.brand.name
-    brand_display.short_description = 'Brand'
+
+    brand_display.short_description = "Brand"
+
 
 admin.site.register(Brand)
 admin.site.register(Product, ProductAdmin)

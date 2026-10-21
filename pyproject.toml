@@ -1,29 +1,10 @@
-[tool.poetry]
-name = "workoutsavings"
-version = "0.1.0"
-description = "scrapt data online"
-authors = ["Gabriel Esteves <54445532+gab-es21@users.noreply.github.com>"]
-readme = "README.md"
-
-[tool.poetry.dependencies]
-python = "^3.10"
-pip-shims = "^0.3.4"
-django = "^4.2.5"
-
-[tool.poetry.group.dev.dependencies]
-pre-commit = "2.19.0"
-flake8 = "3.9.2"
-black = "22.3.0"
-isort = "5.10.1"
-pytest = "^7.4.2"
-
-
-[build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
-
 [tool.black]
 line-length = 120
 
 [tool.isort]
 profile = "black"
+line_length = 120
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "workoutsavings.settings"
+python_files = ["tests.py", "test_*.py"]

@@ -2,6 +2,9 @@
 
 > A visual guide to understand what this project is, how it works today,
 > what's broken, and where it should go.
+>
+> **Update 2026-10-21:** the project goes with **Path B — Django in Docker** (section 11).
+> The Firebase code described in sections 10 and 12 has been removed; it remains in git history.
 
 ---
 
