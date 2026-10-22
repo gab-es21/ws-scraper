@@ -24,6 +24,7 @@ from .base import (
     plain,
     sitemap_urls,
     size_in_grams,
+    strip_size,
     to_decimal,
 )
 
@@ -40,8 +41,6 @@ SLUG_EXCLUDE = re.compile(
     r"|leggings|saqueta|sachet"
 )
 TRACKED_CATEGORIES = ("proteina", "creatina")
-
-SIZE_SUFFIX = re.compile(r"\s*\d+(?:[.,]\d+)?\s*(?:g|kg)\s*$", re.IGNORECASE)
 
 
 class ProzisAdapter(StoreAdapter):
@@ -160,7 +159,7 @@ def parse_items(index_data, page_html, url, category):
                 store_sku=sku["sku"],
                 url=url,
                 brand="Prozis",
-                product_name=SIZE_SUFFIX.sub("", full_name) or full_name,
+                product_name=strip_size(full_name),
                 flavor=sku.get("flavorDescription") or "",
                 size_g=size_in_grams(sku.get("optionDescription")) or size_in_grams(full_name),
                 price=price,

@@ -12,7 +12,7 @@ nutrition stays empty unless entered in the admin (scrapes never overwrite it).
 import re
 
 from ..recording import ScrapedItem
-from .base import PageResult, StoreAdapter, plain, size_in_grams, to_decimal
+from .base import PageResult, StoreAdapter, plain, size_in_grams, strip_size, to_decimal
 
 BASE = "https://goldnutrition.pt"
 FEED_URL = f"{BASE}/products.json"
@@ -92,7 +92,7 @@ def parse_product(product, url):
                 store_sku=str(variant["id"]),
                 url=url,
                 brand="Gold Nutrition",
-                product_name=re.sub(r"\s*\d+\s*g$", "", title, flags=re.IGNORECASE),
+                product_name=strip_size(title),
                 flavor=option_value(product, variant, FLAVOR_OPTIONS),
                 size_g=size,
                 price=price,

@@ -108,6 +108,14 @@ def size_in_grams(text):
     return value * 1000 if match.group(2).lower() == "kg" else value
 
 
+SIZE_SUFFIX = re.compile(r"\s*\d+(?:[.,]\d+)?\s*(?:g|kg)\s*$", re.IGNORECASE)
+
+
+def strip_size(name):
+    """'Whey + Fibre 700 g' -> 'Whey + Fibre': sizes are variants, not part of the product name."""
+    return SIZE_SUFFIX.sub("", name or "") or name or ""
+
+
 def plain(text):
     """Lowercase without accents, for matching labels like 'Lípidos' or 'Proteína'."""
     decomposed = unicodedata.normalize("NFKD", str(text or ""))
@@ -118,7 +126,7 @@ def plain(text):
 # Prefix matching skips sub-rows such as "dos quais saturados" / "of which sugars".
 NUTRIENT_LABELS = {
     "protein_g": ("proteina", "protein"),
-    "carbs_g": ("hidratos de carbono", "carboidratos", "carbohidratos", "carbohydrate"),
+    "carbs_g": ("hidratos", "carbo"),
     "fat_g": ("lipidos", "gordura", "fat"),
 }
 
