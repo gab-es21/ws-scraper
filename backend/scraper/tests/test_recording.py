@@ -153,6 +153,15 @@ def test_flavors_and_sizes_are_variants_of_one_product(store):
     assert Listing.objects.count() == 3
 
 
+def test_a_sku_moving_to_another_variant_keeps_its_history_and_drops_the_orphan(store):
+    record_item(store, item(size_g=None), seen_at=day(0))
+    result = record_item(store, item(size_g=Decimal("700")), seen_at=day(1))
+
+    assert Variant.objects.count() == 1
+    assert result.listing.variant.size_g == Decimal("700.0")
+    assert PriceRecord.objects.filter(listing=result.listing).count() == 1
+
+
 def test_a_listing_cannot_have_two_current_prices(store):
     listing = record_item(store, item(), seen_at=day(0)).listing
 

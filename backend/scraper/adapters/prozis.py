@@ -12,11 +12,20 @@ Prozis' advertised price already includes its best public coupon (the JSON-LD
 price is stored as-is and the coupon only as information.
 """
 
-import gzip
 import re
 
 from ..recording import ScrapedItem
-from .base import PageResult, ScrapedCoupon, StoreAdapter, jsonld_objects, plain, size_in_grams, to_decimal
+from .base import (
+    PageResult,
+    ScrapedCoupon,
+    StoreAdapter,
+    jsonld_objects,
+    nutrient_field,
+    plain,
+    sitemap_urls,
+    size_in_grams,
+    to_decimal,
+)
 
 BASE = "https://www.prozis.com/pt/pt"
 SITEMAP_URL = "https://prozis.com/pt/pt/sitemap_products.gz"
@@ -105,10 +114,7 @@ class ProzisAdapter(StoreAdapter):
 
 
 def parse_sitemap(content):
-    if content[:2] == b"\x1f\x8b":
-        content = gzip.decompress(content)
-    urls = re.findall(r"<loc>\s*([^<\s]+)\s*</loc>", content.decode("utf-8", "replace"))
-    return [url for url in urls if is_candidate(url)]
+    return [url for url in sitemap_urls(content) if is_candidate(url)]
 
 
 def is_candidate(url):
@@ -170,17 +176,11 @@ def parse_items(index_data, page_html, url, category):
 def parse_nutrition(nutrition_data):
     """Grams per 100 g of protein, carbs and fat from the nutrition-table endpoint."""
     nutrients = nutrition_data.get("nutTable", {}).get("table", {}).get("nutrients", [])
-    labels = {
-        "protein_g": ("proteina",),
-        "carbs_g": ("hidratos de carbono", "carboidratos"),
-        "fat_g": ("lipidos", "gordura"),
-    }
     values = {}
     for nutrient in nutrients:
-        label = plain(nutrient.get("name"))
-        for field, prefixes in labels.items():
-            if field not in values and label.startswith(prefixes):
-                values[field] = to_decimal((nutrient.get("amount") or {}).get("by100"))
+        field = nutrient_field(nutrient.get("name"))
+        if field and field not in values:
+            values[field] = to_decimal((nutrient.get("amount") or {}).get("by100"))
     return values
 
 

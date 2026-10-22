@@ -2,7 +2,16 @@ from decimal import Decimal
 
 import pytest
 
-from scraper.adapters.base import Blocked, HttpClient, jsonld_objects, plain, size_in_grams, to_decimal
+from scraper.adapters.base import (
+    Blocked,
+    HttpClient,
+    jsonld_objects,
+    nutrition_from_tables,
+    plain,
+    sitemap_urls,
+    size_in_grams,
+    to_decimal,
+)
 
 from .fakes import FakeResponse
 
@@ -77,3 +86,53 @@ def test_http_client_gives_up_when_still_limited():
     with pytest.raises(Blocked):
         http.get("https://x")
     assert [s for s in sleeps if s >= 30] == [30, 60, 90]
+
+
+def table(*rows):
+    return "<table>" + "".join("<tr>" + "".join(f"<td>{c}</td>" for c in row) + "</tr>" for row in rows) + "</table>"
+
+
+def test_nutrition_table_per_100g_column():
+    html = table(
+        ["", "Por 100g", "Por Dose"],
+        ["Lípidos", "3,0g", "0,7g"],
+        ["Hidratos de Carbono", "10g", "2,6g"],
+        ["dos quais açúcares", "2,9g", "0,7g"],
+        ["Proteína", "79g", "20g"],
+    )
+    assert nutrition_from_tables(html) == {
+        "fat_g": Decimal("3.00"),
+        "carbs_g": Decimal("10.00"),
+        "protein_g": Decimal("79.00"),
+    }
+
+
+def test_nutrition_table_header_without_label_cell():
+    html = table(["Por Dose", "Por 100 g"], ["Proteína", "20 g", "80 g"])
+    assert nutrition_from_tables(html) == {"protein_g": Decimal("80.00")}
+
+
+def test_nutrition_table_per_serving_only_is_scaled_to_100g():
+    # Zumub-style: one "Por 30 g" column, mixed Portuguese/English labels.
+    html = table(
+        ["", "Por 30 g", "% Valor Diário"],
+        ["Fat", "1.8 g", "3%"],
+        ["Hidratos de carbono", "1.7 g", "1%"],
+        ["Proteína", "21.4 g", "*"],
+    )
+    assert nutrition_from_tables(html) == {
+        "fat_g": Decimal("6.00"),
+        "carbs_g": Decimal("5.67"),
+        "protein_g": Decimal("71.33"),
+    }
+
+
+def test_tables_without_protein_are_skipped():
+    html = table(["", "Por 100 g"], ["Leucina", "7 g"]) + table(["", "Por 100 g"], ["Proteína", "75 g"])
+    assert nutrition_from_tables(html) == {"protein_g": Decimal("75.00")}
+    assert nutrition_from_tables(table(["Referência", "1ZUM9399"])) == {}
+
+
+def test_sitemap_urls_unescape_entities():
+    xml = b"<urlset><url><loc>https://x.pt/sitemap_products_1.xml?from=1&amp;to=2</loc></url></urlset>"
+    assert sitemap_urls(xml) == ["https://x.pt/sitemap_products_1.xml?from=1&to=2"]

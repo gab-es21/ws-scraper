@@ -1,5 +1,6 @@
 """Shared pieces for store adapters: a polite HTTP client and the adapter interface."""
 
+import gzip
 import json
 import random
 import re
@@ -7,6 +8,7 @@ import time
 import unicodedata
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
+from html import unescape
 
 import requests
 from bs4 import BeautifulSoup
@@ -110,6 +112,74 @@ def plain(text):
     """Lowercase without accents, for matching labels like 'Lípidos' or 'Proteína'."""
     decomposed = unicodedata.normalize("NFKD", str(text or ""))
     return "".join(c for c in decomposed if not unicodedata.combining(c)).lower().strip()
+
+
+# Row labels of nutrition tables (accent-free, lowercase prefixes; stores mix Portuguese and English).
+# Prefix matching skips sub-rows such as "dos quais saturados" / "of which sugars".
+NUTRIENT_LABELS = {
+    "protein_g": ("proteina", "protein"),
+    "carbs_g": ("hidratos de carbono", "carboidratos", "carbohidratos", "carbohydrate"),
+    "fat_g": ("lipidos", "gordura", "fat"),
+}
+
+
+def nutrient_field(label):
+    """'Lípidos' -> 'fat_g', 'Proteínas' -> 'protein_g'; None for other rows."""
+    label = plain(label)
+    for name, prefixes in NUTRIENT_LABELS.items():
+        if label.startswith(prefixes):
+            return name
+    return None
+
+
+def nutrition_from_tables(html):
+    """
+    Protein, carbs and fat per 100 g from the first HTML table that has them.
+
+    Uses the "per 100 g" column; when the table only has a per-serving column
+    ("Por 30 g"), scales it to 100 g.
+    """
+    for table in BeautifulSoup(html, "html.parser").find_all("table"):
+        rows = [[c.get_text(" ", strip=True) for c in tr.find_all(["th", "td"])] for tr in table.find_all("tr")]
+        column = _amount_column(rows)
+        if column is None:
+            continue
+        offset_from_end, grams = column
+        values = {}
+        for row in rows:
+            name = nutrient_field(row[0]) if row else None
+            if name and name not in values and len(row) >= offset_from_end + 1:
+                amount = to_decimal(row[len(row) - offset_from_end])
+                if amount is not None:
+                    values[name] = (amount * 100 / grams).quantize(Decimal("0.01"))
+        if "protein_g" in values:
+            return values
+    return {}
+
+
+def _amount_column(rows):
+    """
+    (position counted from the row end, grams the column refers to) of the best amount column:
+    'Por 100 g' if present, else the first 'Por <n> g'. Counted from the end because header rows
+    often lack the empty label cell that data rows have.
+    """
+    for row in rows:
+        per_grams = [
+            (i, Decimal(m.group(1).replace(",", ".")))
+            for i, cell in enumerate(row)
+            if (m := re.search(r"por\s*(\d+(?:[.,]\d+)?)\s*g\b", plain(cell)))
+        ]
+        if per_grams:
+            index, grams = next(((i, g) for i, g in per_grams if g == 100), per_grams[0])
+            return len(row) - index, grams
+    return None
+
+
+def sitemap_urls(content):
+    """The <loc> URLs of a sitemap or sitemap index, gzipped or not."""
+    if content[:2] == b"\x1f\x8b":
+        content = gzip.decompress(content)
+    return [unescape(url) for url in re.findall(r"<loc>\s*([^<\s]+)\s*</loc>", content.decode("utf-8", "replace"))]
 
 
 def jsonld_objects(html, type_name):

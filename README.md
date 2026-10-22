@@ -2,7 +2,7 @@
 
 A price tracker for protein powder products. Compares prices per 100g and per 100g of protein across brands, tracks price history over time, and supports coupon codes.
 
-**Stores covered:** Prozis, Gold Nutrition *(MyProtein and Zumub planned; Decathlon blocks automated access)*
+**Stores covered:** Prozis, Myprotein, Gold Nutrition *(Zumub planned; Decathlon and Masmusculo block unidentified scripts)*
 
 ---
 
@@ -159,6 +159,7 @@ Avoid starting a manual `docker compose run --rm scraper` while a scheduled run 
 | Store | Discovery | Data |
 |---|---|---|
 | Prozis | products sitemap, filtered by URL and breadcrumb category (protein, creatine) | product page + `product/index` (all SKUs, prices, stock, coupons) + `product/nutrition-table` once per flavor, re-checked weekly |
+| Myprotein | product sitemap, sports-nutrition URLs filtered by slug and JSON-LD category | the product page: JSON-LD `ProductGroup` (every flavor × size, EAN, price, crossed-out price, stock), sizes missing there from the page's embedded "Amount" choices, nutrition from the page's per-100 g table (one table for all flavors) |
 | Gold Nutrition | Shopify `/products.json` feed (1 request), filtered by title | the same feed: every variant's price, crossed-out price, stock, size. No nutrition: product pages answer 429 to scripts, so enter it in the admin if needed |
 
 Prozis' advertised price already includes its best public coupon (e.g. `SUPER`, 15% off the
@@ -210,7 +211,7 @@ ws-scraper/
 │   │   ├── recording.py            # Change-only storage of scraped items
 │   │   ├── runner.py               # Runs a store adapter, logs a ScrapeRun
 │   │   ├── scheduling.py           # Daily run timing (used by `manage.py scheduler`)
-│   │   ├── adapters/               # One module per store (prozis.py, gold_nutrition.py)
+│   │   ├── adapters/               # One module per store; jsonld.py is shared by JSON-LD stores
 │   │   ├── management/commands/
 │   │   │   ├── scrape.py           # `python manage.py scrape`
 │   │   │   └── scheduler.py        # `python manage.py scheduler` (runs forever)
