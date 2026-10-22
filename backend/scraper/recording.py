@@ -93,6 +93,9 @@ def record_item(store, item, seen_at=None):
         variant.gtin = item.gtin
         variant.save(update_fields=["gtin"])
 
+    previous_variant_id = (
+        Listing.objects.filter(store=store, store_sku=item.store_sku).values_list("variant_id", flat=True).first()
+    )
     listing, _ = Listing.objects.update_or_create(
         store=store,
         store_sku=item.store_sku,
@@ -105,6 +108,10 @@ def record_item(store, item, seen_at=None):
             "last_seen_at": seen_at,
         },
     )
+    # The SKU now describes another variant (e.g. its size became known): the listing and its
+    # history moved; drop the old variant if nothing else uses it.
+    if previous_variant_id and previous_variant_id != variant.id:
+        Variant.objects.filter(id=previous_variant_id, listings__isnull=True).delete()
 
     price_changed = _record_change(
         PriceRecord,
