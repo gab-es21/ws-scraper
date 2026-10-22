@@ -15,7 +15,7 @@ The site sends no charset, so pages are decoded as UTF-8 explicitly.
 import json
 import re
 
-from .base import PageResult, StoreAdapter, nutrition_from_tables, plain, size_in_grams, sitemap_urls
+from .base import PageResult, StoreAdapter, nutrition_from_tables, plain, sitemap_urls, size_in_grams
 from .jsonld import product_group, scraped_items
 
 BASE = "https://www.myprotein.pt"

@@ -10,6 +10,7 @@ from scraper.adapters.base import (
     plain,
     sitemap_urls,
     size_in_grams,
+    strip_size,
     to_decimal,
 )
 
@@ -136,3 +137,10 @@ def test_tables_without_protein_are_skipped():
 def test_sitemap_urls_unescape_entities():
     xml = b"<urlset><url><loc>https://x.pt/sitemap_products_1.xml?from=1&amp;to=2</loc></url></urlset>"
     assert sitemap_urls(xml) == ["https://x.pt/sitemap_products_1.xml?from=1&to=2"]
+
+
+def test_strip_size_keeps_the_product_name():
+    assert strip_size("Whey + Fibre 700 g") == "Whey + Fibre"
+    assert strip_size("100% Whey Gold Standard 2,27kg") == "100% Whey Gold Standard"
+    assert strip_size("Creatina Creapure 80 cápsulas") == "Creatina Creapure 80 cápsulas"
+    assert strip_size("500g") == "500g"  # nothing left: keep the original

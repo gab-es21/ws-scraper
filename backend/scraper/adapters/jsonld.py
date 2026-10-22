@@ -3,7 +3,7 @@
 import re
 
 from ..recording import ScrapedItem
-from .base import jsonld_objects, plain, size_in_grams, to_decimal
+from .base import jsonld_objects, plain, size_in_grams, strip_size, to_decimal
 
 GRAM_UNITS = {"g": 1, "grm": 1, "gram": 1, "grams": 1, "kg": 1000, "kgm": 1000}
 
@@ -78,7 +78,7 @@ def scraped_items(group, variants, url, default_brand, nutrition=None):
                 store_sku=str(sku),
                 url=url,
                 brand=brand,
-                product_name=group.get("name") or variant.get("name") or "",
+                product_name=strip_size(group.get("name") or variant.get("name")),
                 flavor=variant_flavor(variant),
                 size_g=variant_size_g(variant),
                 price=price,

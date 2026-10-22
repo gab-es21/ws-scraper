@@ -2,7 +2,7 @@
 
 A price tracker for protein powder products. Compares prices per 100g and per 100g of protein across brands, tracks price history over time, and supports coupon codes.
 
-**Stores covered:** Prozis, Myprotein, Gold Nutrition *(Zumub planned; Decathlon and Masmusculo block unidentified scripts)*
+**Stores covered:** Prozis, Myprotein, Zumub, Gold Nutrition *(Decathlon and Masmusculo block unidentified scripts)*
 
 ---
 
@@ -160,6 +160,7 @@ Avoid starting a manual `docker compose run --rm scraper` while a scheduled run 
 |---|---|---|
 | Prozis | products sitemap, filtered by URL and breadcrumb category (protein, creatine) | product page + `product/index` (all SKUs, prices, stock, coupons) + `product/nutrition-table` once per flavor, re-checked weekly |
 | Myprotein | product sitemap, sports-nutrition URLs filtered by slug and JSON-LD category | the product page: JSON-LD `ProductGroup` (every flavor × size, EAN, price, crossed-out price, stock), sizes missing there from the page's embedded "Amount" choices, nutrition from the page's per-100 g table (one table for all flavors) |
+| Zumub | protein and creatine category pages (JSON-LD item lists, `?page=N`); no sitemap | the product page: JSON-LD `ProductGroup` (one variant per size, several brands, price, list price, stock, EAN), nutrition from the per-serving table scaled to 100 g |
 | Gold Nutrition | Shopify `/products.json` feed (1 request), filtered by title | the same feed: every variant's price, crossed-out price, stock, size. No nutrition: product pages answer 429 to scripts, so enter it in the admin if needed |
 
 Prozis' advertised price already includes its best public coupon (e.g. `SUPER`, 15% off the
